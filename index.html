@@ -1097,7 +1097,12 @@ function update(word) {
 }
 
 const input = document.getElementById('wordInput');
-input.addEventListener('input', e => update(e.target.value));
+input.addEventListener('input', e => {
+  const val = e.target.value.trim();
+  const newPath = val ? '/' + encodeURIComponent(val) : '/';
+  history.replaceState(null, '', newPath);
+  update(val);
+});
 input.focus();
 
 // Length toggle buttons
@@ -1111,9 +1116,11 @@ document.querySelectorAll('.len-btn').forEach(btn => {
   });
 });
 
-// Seed with an example that demonstrates cluster-X
-update('reduction');
-input.value = 'reduction';
+// Read word from URL path on load (e.g. /reduction)
+const pathWord = decodeURIComponent(location.pathname.replace(/^\//, '').trim());
+const seedWord = pathWord || 'reduction';
+update(seedWord);
+input.value = seedWord;
 </script>
 </body>
 </html>

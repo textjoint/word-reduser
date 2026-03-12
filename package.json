@@ -1,0 +1,14 @@
+{
+  "name": "word-reduser",
+  "version": "1.0.0",
+  "description": "Lexical Compression Engine - a text processing tool",
+  "type": "module",
+  "scripts": {
+    "start": "npx serve -p 8080",
+    "dev": "npx serve -p 8080 -s",
+    "serve": "npx http-server -p 8080 -c-1"
+  },
+  "keywords": ["text", "compression", "lexical"],
+  "author": "",
+  "license": "ISC"
+}
