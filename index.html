@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lexical Compression Engine</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c0f;
+    --surface: #111418;
+    --surface2: #181c22;
+    --border: #1e242d;
+    --border2: #252c38;
+    --accent: #4af0a0;
+    --accent2: #0affb8;
+    --accent-dim: #1a5c3e;
+    --text: #c8d4e0;
+    --text-dim: #5a6a7a;
+    --text-bright: #e8f0f8;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+    --warn: #f0a04a;
+    --info: #4a9ef0;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(74,240,160,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(74,240,160,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  /* Header */
+  header {
+    margin-bottom: 48px;
+  }
+
+  .header-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    opacity: 0.7;
+  }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: clamp(22px, 4vw, 36px);
+    font-weight: 600;
+    color: var(--text-bright);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  h1 span {
+    color: var(--accent);
+  }
+
+  .subtitle {
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-weight: 300;
+    letter-spacing: 0.02em;
+    line-height: 1.6;
+  }
+
+  /* Input area */
+  .input-section {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 24px;
+    margin-bottom: 36px;
+    position: relative;
+  }
+
+  .input-section::before {
+    content: 'INPUT';
+    position: absolute;
+    top: -1px;
+    left: 20px;
+    transform: translateY(-50%);
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    background: var(--surface);
+    padding: 0 8px;
+  }
+
+  .len-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .len-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-right: 4px;
+  }
+
+  .len-btn {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    width: 36px;
+    height: 36px;
+    border-radius: 4px;
+    border: 1px solid var(--border2);
+    background: var(--bg);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.02em;
+  }
+
+  .len-btn:hover {
+    border-color: var(--accent-dim);
+    color: var(--text);
+  }
+
+  .len-btn.active {
+    background: rgba(74,240,160,0.12);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 8px rgba(74,240,160,0.1);
+  }
+
+  .input-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  input[type="text"] {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    color: var(--text-bright);
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 400;
+    padding: 14px 18px;
+    outline: none;
+    letter-spacing: 0.05em;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  input[type="text"]::placeholder {
+    color: var(--text-dim);
+    font-size: 14px;
+    letter-spacing: 0.02em;
+  }
+
+  input[type="text"]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(74,240,160,0.08);
+  }
+
+  .word-stats {
+    margin-top: 14px;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .stat-val {
+    color: var(--accent);
+    margin-left: 4px;
+  }
+
+  /* Results grid */
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
+  .method-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s;
+    position: relative;
+  }
+
+  .method-card:hover,
+  .method-card:focus-within {
+    border-color: var(--accent-dim);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+
+  .method-card:hover .method-name,
+  .method-card:focus-within .method-name {
+    color: var(--accent);
+  }
+
+  .method-card:hover .method-basis,
+  .method-card:focus-within .method-basis {
+    color: var(--text-dim);
+    opacity: 1;
+  }
+
+  .method-card:hover .rule-text,
+  .method-card:focus-within .rule-text {
+    color: var(--text);
+  }
+
+  .method-card:hover .entropy-label,
+  .method-card:focus-within .entropy-label {
+    color: var(--text);
+  }
+
+  .cluster-card:hover,
+  .cluster-card:focus-within {
+    border-color: rgba(240,160,74,0.5) !important;
+    box-shadow: 0 4px 20px rgba(240,160,74,0.06);
+  }
+
+  .cluster-card:hover .cluster-body-text,
+  .cluster-card:focus-within .cluster-body-text {
+    color: rgba(240,160,74,0.8);
+  }
+
+  .cluster-card:hover .cluster-examples,
+  .cluster-card:focus-within .cluster-examples {
+    color: rgba(240,160,74,0.5);
+  }
+
+  .card-header {
+    padding: 14px 18px 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .method-index {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--accent-dim);
+    padding: 2px 6px;
+    border: 1px solid var(--accent-dim);
+    border-radius: 2px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .method-name {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-bright);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    line-height: 1.3;
+  }
+
+  .method-basis {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 3px;
+    font-family: var(--mono);
+    font-weight: 300;
+  }
+
+  .card-body {
+    padding: 18px;
+  }
+
+  /* The big output */
+  .output-display {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .output-code {
+    font-family: var(--mono);
+    font-size: 38px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.12em;
+    line-height: 1;
+    transition: opacity 0.15s;
+  }
+
+  .output-code.empty {
+    color: var(--border2);
+    font-size: 28px;
+    letter-spacing: 0.06em;
+  }
+
+  /* Letter decomposition visual */
+  .decomp {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+    min-height: 28px;
+    align-items: center;
+  }
+
+  .letter-chip {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 3px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    transition: all 0.2s;
+    line-height: 1;
+  }
+
+  .letter-chip.kept {
+    background: rgba(74,240,160,0.15);
+    color: var(--accent);
+    border: 1px solid rgba(74,240,160,0.3);
+  }
+
+  .letter-chip.dropped {
+    background: rgba(255,255,255,0.03);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    text-decoration: line-through;
+    text-decoration-color: rgba(90,106,122,0.5);
+  }
+
+  .letter-chip.primary {
+    background: rgba(74,240,160,0.25);
+    color: #6aff b8;
+    border: 1px solid rgba(74,240,160,0.5);
+    box-shadow: 0 0 8px rgba(74,240,160,0.1);
+  }
+
+  /* Rule description */
+  .rule-text {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    font-family: var(--mono);
+    font-weight: 300;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+
+  /* Entropy bar */
+  .entropy-bar-wrap {
+    margin-bottom: 10px;
+  }
+
+  .entropy-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .entropy-bar {
+    height: 3px;
+    background: var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .entropy-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+    border-radius: 2px;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Empty state */
+  .empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 48px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+  }
+
+  /* Section label */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Comparison strip at bottom of each card */
+  .coverage-dots {
+    display: flex;
+    gap: 3px;
+    margin-bottom: 10px;
+  }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border2);
+  }
+
+  .dot.lit {
+    background: var(--accent);
+    box-shadow: 0 0 4px rgba(74,240,160,0.4);
+  }
+
+  .dot.partial {
+    background: var(--warn);
+  }
+
+  /* Info row */
+  .info-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .info-pill {
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 400;
+  }
+
+  .pill-info { background: rgba(74,158,240,0.15); color: var(--info); }
+  .pill-cog  { background: rgba(240,160,74,0.15); color: var(--warn); }
+  .pill-both { background: rgba(74,240,160,0.1); color: var(--accent); }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .method-card { animation: fadeUp 0.3s ease both; }
+  .method-card:nth-child(1) { animation-delay: 0.02s; }
+  .method-card:nth-child(2) { animation-delay: 0.06s; }
+  .method-card:nth-child(3) { animation-delay: 0.10s; }
+  .method-card:nth-child(4) { animation-delay: 0.14s; }
+  .method-card:nth-child(5) { animation-delay: 0.18s; }
+  .method-card:nth-child(6) { animation-delay: 0.22s; }
+  .method-card:nth-child(7) { animation-delay: 0.26s; }
+  .method-card:nth-child(8) { animation-delay: 0.30s; }
+
+  /* Substituted chip — letter(s) replaced by X, not just kept/dropped */
+  .letter-chip.substituted {
+    background: rgba(240,160,74,0.18);
+    color: var(--warn);
+    border: 1px solid rgba(240,160,74,0.4);
+    position: relative;
+  }
+  .letter-chip.collapsed {
+    background: rgba(240,160,74,0.07);
+    color: rgba(240,160,74,0.35);
+    border: 1px solid rgba(240,160,74,0.15);
+    text-decoration: line-through;
+    text-decoration-color: rgba(240,160,74,0.3);
+  }
+  .subst-arrow {
+    font-size: 9px;
+    color: var(--warn);
+    opacity: 0.6;
+    margin: 0 1px;
+  }
+
+  /* Cluster-X standalone card */
+  .cluster-card {
+    border-color: rgba(240,160,74,0.25);
+    background: rgba(240,160,74,0.04);
+  }
+
+  .cluster-card:hover { border-color: rgba(240,160,74,0.45); }
+
+  .cluster-card .card-header {
+    border-bottom-color: rgba(240,160,74,0.15);
+  }
+
+  .cluster-index {
+    border-color: rgba(240,160,74,0.35) !important;
+    color: var(--warn) !important;
+  }
+
+  .cluster-title {
+    color: var(--warn) !important;
+  }
+
+  .cluster-found {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .cluster-chip {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 3px;
+    background: rgba(240,160,74,0.15);
+    color: var(--warn);
+    border: 1px solid rgba(240,160,74,0.35);
+    letter-spacing: 0.06em;
+  }
+
+  .cluster-none {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: rgba(240,160,74,0.35);
+    margin-bottom: 14px;
+    letter-spacing: 0.04em;
+  }
+
+  .cluster-body-text {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: rgba(240,160,74,0.55);
+    font-weight: 300;
+    line-height: 1.7;
+    margin-bottom: 14px;
+  }
+
+  .cluster-body-text em {
+    font-style: normal;
+    color: rgba(240,160,74,0.8);
+  }
+
+  .cluster-examples {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: rgba(240,160,74,0.3);
+    border-top: 1px solid rgba(240,160,74,0.1);
+    padding-top: 10px;
+    letter-spacing: 0.04em;
+  }
+
+  .cluster-ex-label {
+    color: rgba(240,160,74,0.5);
+    margin-right: 4px;
+  }
+
+  footer {
+    text-align: center;
+    padding: 32px 0 0;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="header-tag">Lexical Compression Engine · v1.0</div>
+    <h1>Lexical Compression <span>→</span> <span id="titleLen">3</span>-Letter</h1>
+    <div class="subtitle">
+      Information theory · Cognitive science · Morphological analysis<br>
+      Seven approaches — one input
+    </div>
+  </header>
+
+  <div class="input-section">
+    <div class="input-row">
+      <input type="text" id="wordInput" placeholder="type a word or term…" maxlength="40" autocomplete="off" spellcheck="false">
+      <div class="len-toggle">
+        <span class="len-label">letters</span>
+        <button class="len-btn" data-len="2">2</button>
+        <button class="len-btn active" data-len="3">3</button>
+        <button class="len-btn" data-len="4">4</button>
+        <button class="len-btn" data-len="5">5</button>
+      </div>
+    </div>
+    <div class="word-stats" id="wordStats"></div>
+  </div>
+
+  <div class="section-label">compression outputs</div>
+  <div class="results-grid" id="resultsGrid">
+    <div class="empty-state">→ enter a word above to run all methods</div>
+  </div>
+
+</div>
+
+<footer>based on Shannon (1948) · McClelland & Rumelhart (1981) · Whitney SERIOL (2001) · Grainger et al.</footer>
+
+<script>
+// ─────────────────────────────────────────────
+// DATA: English letter frequencies (Shannon, 1951)
+// Used to compute surprisal / information content
+// ─────────────────────────────────────────────
+const FREQ = {
+  e:0.127, t:0.091, a:0.082, o:0.075, i:0.070, n:0.067,
+  s:0.063, h:0.061, r:0.060, d:0.043, l:0.040, c:0.028,
+  u:0.028, m:0.024, w:0.024, f:0.022, g:0.020, y:0.020,
+  p:0.019, b:0.015, v:0.010, k:0.008, j:0.002, x:0.002,
+  q:0.001, z:0.001
+};
+
+// Surprisal = -log2(p) — higher means rarer, more informative
+function surprisal(ch) {
+  const p = FREQ[ch.toLowerCase()] || 0.001;
+  return -Math.log2(p);
+}
+
+// Phonetic distinctiveness weights (stops + fricatives > sonorants)
+const PHON = {
+  b:8, d:8, g:7, k:9, p:8, t:8,   // stops — very distinctive
+  f:8, v:7, s:7, z:9, x:9, j:8,   // fricatives
+  c:6, q:9,                         // rare/distinctive
+  h:4, w:4, y:3,                    // semi-vowels
+  l:3, m:3, n:3, r:3,               // sonorants — common, less distinctive
+  a:1, e:1, i:1, o:1, u:1          // vowels — lowest distinctiveness
+};
+
+function phonWeight(ch) {
+  return PHON[ch.toLowerCase()] || 5;
+}
+
+const VOWELS = new Set(['a','e','i','o','u']);
+function isVowel(ch) { return VOWELS.has(ch.toLowerCase()); }
+function isAlpha(ch) { return /[a-zA-Z]/.test(ch); }
+
+// Compute a "recognizability score" for a proposed 3-letter code
+// relative to the original word. Higher = better.
+function recognizabilityScore(code, word) {
+  if (!code || code.length === 0) return 0;
+  const w = word.toLowerCase();
+  const c = code.toLowerCase();
+  let score = 0;
+  // First letter match (highest weight per SERIOL)
+  if (c[0] === w[0]) score += 40;
+  // Last letter match
+  if (c[c.length-1] === w[w.length-1]) score += 15;
+  // Letters are a subsequence of the word
+  let wi = 0;
+  for (let ci = 0; ci < c.length; ci++) {
+    while (wi < w.length && w[wi] !== c[ci]) wi++;
+    if (wi < w.length) { score += 10; wi++; }
+  }
+  // Bonus: preserves consonantal root signature
+  const wordConsonants = w.split('').filter(ch => !isVowel(ch) && isAlpha(ch));
+  const codeConsonants = c.split('').filter(ch => !isVowel(ch) && isAlpha(ch));
+  const shared = codeConsonants.filter(ch => wordConsonants.includes(ch)).length;
+  score += shared * 5;
+  return Math.min(100, score);
+}
+
+
+// ─────────────────────────────────────────────
+// THE SEVEN METHODS
+// Each accepts (word, n) where n = target output length
+// ─────────────────────────────────────────────
+
+// 1. PURE TRUNCATION
+function methodTruncation(word, n) {
+  const w = word.replace(/[^a-zA-Z]/g, '');
+  const code = w.slice(0, n).toUpperCase();
+  const decomp = w.split('').map((ch, i) => ({ch: ch.toUpperCase(), kept: i < n, primary: false}));
+  return {
+    code,
+    decomp,
+    rule: `keep first ${n} characters verbatim. simplest possible truncation — no linguistic analysis.`,
+    basis: 'Baseline / engineering default',
+    pilltag: null,
+    entropy: 20
+  };
+}
+
+// 2. DISEMVOWELING + TRUNCATE
+function methodDisemvowel(word, n) {
+  const w = word.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  const consonants = [];
+  for (let i = 0; i < w.length; i++) {
+    if (i === 0 || !isVowel(w[i])) consonants.push({ch: w[i], origIdx: i});
+  }
+  const kept = new Set(consonants.slice(0, n).map(x => x.origIdx));
+  const code = consonants.slice(0, n).map(x => x.ch).join('').toUpperCase();
+  const decomp = w.split('').map((ch, i) => ({ch: ch.toUpperCase(), kept: kept.has(i), primary: false}));
+  return {
+    code,
+    decomp,
+    rule: `strip interior vowels (consonantal skeleton), take first ${n} consonants. rooted in Semitic writing systems and confirmed by Shannon\'s entropy analysis: vowels carry ~30% less information per position than consonants.`,
+    basis: 'Semitic consonantal root + Shannon entropy',
+    pilltag: 'info',
+    entropy: 55
+  };
+}
+
+// 3. HEAD–BODY–TAIL
+// First + last locked; interior slots pick highest-phonetic-weight medial consonants
+function methodHBT(word, n) {
+  const w = word.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  if (w.length <= n) {
+    const decomp = w.split('').map((ch, i) => ({ch: ch.toUpperCase(), kept: true, primary: i === 0 || i === w.length-1}));
+    return { code: w.toUpperCase(), decomp, rule: `word is ≤${n} letters — no compression needed.`, basis: 'Head–Body–Tail', pilltag: 'both', entropy: 65 };
+  }
+  const first = { ch: w[0], idx: 0 };
+  const last  = { ch: w[w.length-1], idx: w.length-1 };
+  const nMid  = n - 2; // slots between first and last
+  // Score all interior positions
+  const interior = [];
+  for (let i = 1; i < w.length - 1; i++) {
+    if (isAlpha(w[i])) interior.push({ ch: w[i], idx: i, sc: phonWeight(w[i]) + surprisal(w[i]) * 0.5 });
+  }
+  interior.sort((a, b) => b.sc - a.sc);
+  const mids = interior.slice(0, nMid).sort((a, b) => a.idx - b.idx);
+  const picks = [first, ...mids, last];
+  const keptIdxs = new Set(picks.map(p => p.idx));
+  const code = picks.map(p => p.ch).join('').toUpperCase();
+  const decomp = w.split('').map((ch, i) => ({
+    ch: ch.toUpperCase(), kept: keptIdxs.has(i), primary: i === 0 || i === w.length - 1
+  }));
+  return {
+    code, decomp,
+    rule: `first [${first.ch.toUpperCase()}] + last [${last.ch.toUpperCase()}] fixed (exterior-letter superiority). ${nMid} interior slot${nMid!==1?'s':''} filled by highest-phonetic-weight consonant${nMid!==1?'s':''}: [${mids.map(m=>m.ch.toUpperCase()).join(', ')}].`,
+    basis: 'Engineering heuristic + Grainger exterior-letter effect',
+    pilltag: 'cog',
+    entropy: 70
+  };
+}
+
+// 4. SHANNON OPTIMAL
+// Keep first letter, then pick n-1 remaining by highest surprisal
+function methodShannon(word, n) {
+  const w = word.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  if (w.length <= n) {
+    return { code: w.toUpperCase(), decomp: w.split('').map(ch => ({ch: ch.toUpperCase(), kept: true, primary: false})),
+      rule: `word ≤${n} letters.`, basis: 'Shannon surprisal', pilltag: 'info', entropy: 85 };
+  }
+  const firstIdx = 0;
+  const candidates = [];
+  for (let i = 1; i < w.length; i++) {
+    if (isAlpha(w[i])) candidates.push({ ch: w[i], idx: i, s: surprisal(w[i]) });
+  }
+  candidates.sort((a, b) => b.s - a.s);
+  const picks = candidates.slice(0, n - 1).sort((a, b) => a.idx - b.idx);
+  const keptIdxs = new Set([firstIdx, ...picks.map(x => x.idx)]);
+  const code = [w[firstIdx], ...picks.map(x => x.ch)].join('').toUpperCase();
+  const decomp = w.split('').map((ch, i) => ({
+    ch: ch.toUpperCase(), kept: keptIdxs.has(i), primary: i === firstIdx
+  }));
+  return {
+    code, decomp,
+    rule: `first letter [${w[firstIdx].toUpperCase()}] fixed. remaining ${n-1} slot${n-1!==1?'s':''} filled by highest-surprisal letters: [${picks.map(x=>x.ch.toUpperCase()).join(', ')}]. rare/unexpected letters carry more bits — keep what surprises you, drop what you can predict.`,
+    basis: 'Shannon (1948) surprisal maximization',
+    pilltag: 'info',
+    entropy: 88
+  };
+}
+
+// 5. SERIOL-INSPIRED
+// First + last locked; n-2 interior slots by highest surprisal
+function methodSERIOL(word, n) {
+  const w = word.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  if (w.length <= n) {
+    return { code: w.toUpperCase(), decomp: w.split('').map(ch => ({ch: ch.toUpperCase(), kept: true, primary: true})),
+      rule: `word ≤${n} letters.`, basis: 'SERIOL model', pilltag: 'cog', entropy: 75 };
+  }
+  const first = w[0];
+  const last  = w[w.length - 1];
+  const nMid  = n - 2;
+  // Pick nMid interior letters by highest surprisal
+  const interior = [];
+  for (let i = 1; i < w.length - 1; i++) {
+    interior.push({ ch: w[i], idx: i, s: surprisal(w[i]) });
+  }
+  interior.sort((a, b) => b.s - a.s);
+  const mids = interior.slice(0, nMid).sort((a, b) => a.idx - b.idx);
+  const keptIdxs = new Set([0, ...mids.map(m => m.idx), w.length-1]);
+  const code = [first, ...mids.map(m => m.ch), last].join('').toUpperCase();
+  const decomp = w.split('').map((ch, i) => ({
+    ch: ch.toUpperCase(), kept: keptIdxs.has(i), primary: i === 0 || i === w.length - 1
+  }));
+  return {
+    code, decomp,
+    rule: `first [${first.toUpperCase()}] + last [${last.toUpperCase()}] fixed per SERIOL exterior-letter superiority. ${nMid} interior slot${nMid!==1?'s':''} filled by highest-surprisal letter${nMid!==1?'s':''}: [${mids.map(m=>m.ch.toUpperCase()).join(', ')||'—'}].`,
+    basis: 'Whitney SERIOL model (2001) + Shannon surprisal',
+    pilltag: 'both',
+    entropy: 80
+  };
+}
+
+// 6. PHONETIC SKELETON
+// First fixed; n-1 remaining slots filled by highest-phonetic-weight consonants
+function methodPhonetic(word, n) {
+  const w = word.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  const scored = w.split('').map((ch, i) => ({
+    ch, idx: i, score: isVowel(ch) ? 0 : phonWeight(ch)
+  }));
+  const first = scored[0];
+  const rest  = scored.slice(1).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
+  const pick  = rest.slice(0, n - 1).sort((a, b) => a.idx - b.idx);
+  const keptIdxs = new Set([first.idx, ...pick.map(x => x.idx)]);
+  const code = [first.ch, ...pick.map(x => x.ch)].join('').toUpperCase();
+  const decomp = w.split('').map((ch, i) => ({
+    ch: ch.toUpperCase(), kept: keptIdxs.has(i), primary: i === 0
+  }));
+  return {
+    code, decomp,
+    rule: `drop all vowels and sonorants (L,M,N,R — too common to disambiguate). keep stops and fricatives by phonetic distinctiveness weight. first letter fixed; ${n-1} remaining slot${n-1!==1?'s':''} take the highest-scoring consonants.`,
+    basis: 'Phonological markedness + consonant distinctiveness',
+    pilltag: 'info',
+    entropy: 72
+  };
+}
+
+// 7. MORPHOLOGICAL ROOT
+// Onset + nucleus consonants + coda, scaled to n
+function methodMorphological(word, n) {
+  const w = word.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  const letters = w.split('');
+
+  let onsetEnd = 0;
+  while (onsetEnd < letters.length && !isVowel(letters[onsetEnd])) onsetEnd++;
+  const onset = letters.slice(0, onsetEnd);
+
+  let codaStart = letters.length - 1;
+  while (codaStart > 0 && !isVowel(letters[codaStart])) codaStart--;
+  codaStart++;
+  const coda = letters.slice(codaStart);
+
+  const nucleus = [];
+  for (let i = onsetEnd; i < codaStart; i++) {
+    if (!isVowel(letters[i])) nucleus.push({ ch: letters[i], idx: i });
+  }
+  nucleus.sort((a, b) => phonWeight(b.ch) - phonWeight(a.ch));
+
+  const picks = [];
+  // Fill up to n picks from onset, nucleus, coda in order
+  for (const ch of onset)    { if (picks.length < n) picks.push({ ch, idx: onset.indexOf(ch) }); }
+  for (const nx of nucleus)  { if (picks.length < n) picks.push(nx); }
+  for (let i = 0; i < coda.length && picks.length < n; i++) picks.push({ ch: coda[i], idx: codaStart + i });
+  // Fill remainder from leftover consonants
+  for (let i = 1; i < letters.length && picks.length < n; i++) {
+    if (!isVowel(letters[i]) && !picks.find(p => p.idx === i))
+      picks.push({ ch: letters[i], idx: i });
+  }
+  picks.sort((a, b) => a.idx - b.idx);
+
+  const keptIdxs = new Set(picks.map(p => p.idx));
+  const code = picks.map(p => p.ch).join('').toUpperCase().slice(0, n);
+  const decomp = w.split('').map((ch, i) => ({
+    ch: ch.toUpperCase(), kept: keptIdxs.has(i), primary: false
+  }));
+  return {
+    code, decomp,
+    rule: `extract onset [${onset.join('').toUpperCase()||'—'}] + nucleus consonant${nucleus.length!==1?'s':''} [${nucleus.slice(0,n).map(x=>x.ch.toUpperCase()).join(', ')||'—'}] + coda [${coda[0]?.toUpperCase()||'—'}], scaled to ${n} letters. models Semitic trilateral root extraction — consonants that activate an entire morphological family.`,
+    basis: 'Morphological priming + Semitic trilateral root model',
+    pilltag: 'cog',
+    entropy: 68
+  };
+}
+
+
+// ─────────────────────────────────────────────
+// CLUSTER-X UTILITY
+// Not a standalone method — used as a modifier annotation
+// on all other cards when the input contains substitutable clusters.
+// ─────────────────────────────────────────────
+
+const CLUSTER_RULES = [
+  { pattern: /ction/g, replacement: 'x', label: 'ction→X' },
+  { pattern: /xion/g,  replacement: 'x', label: 'xion→X'  },
+  { pattern: /ct/g,    replacement: 'x', label: 'ct→X'     },
+  { pattern: /xt/g,    replacement: 'x', label: 'xt→X'     },
+  { pattern: /cks/g,   replacement: 'x', label: 'cks→X'    },
+  { pattern: /ks/g,    replacement: 'x', label: 'ks→X'     },
+  { pattern: /cc(?=[ei])/g, replacement: 'x', label: 'cc→X' },
+  { pattern: /qu/g,    replacement: 'x', label: 'qu→X'     },
+];
+
+// Returns { hasCluster, substituted, clusters } where:
+//   substituted = the word with clusters replaced by 'x'
+//   clusters    = list of matched substitutions e.g. ['ct→X']
+function detectClusters(word) {
+  const w = word.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  let result = w;
+  const found = [];
+  for (const rule of CLUSTER_RULES) {
+    rule.pattern.lastIndex = 0;
+    if (rule.pattern.test(result)) {
+      found.push(rule.label);
+      rule.pattern.lastIndex = 0;
+      result = result.replace(rule.pattern, 'x');
+    }
+  }
+  return { hasCluster: found.length > 0, substituted: result, clusters: found };
+}
+
+
+// ─────────────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────────────
+
+let targetLen = 3;
+
+const METHODS = [
+  { fn: methodTruncation,    id: '01', name: 'Pure Truncation',       tag: null  },
+  { fn: methodDisemvowel,    id: '02', name: 'Disemvoweling',         tag: 'info' },
+  { fn: methodShannon,       id: '03', name: 'Shannon Surprisal',     tag: 'info' },
+  { fn: methodHBT,           id: '04', name: 'Head–Body–Tail',        tag: 'cog'  },
+  { fn: methodSERIOL,        id: '05', name: 'SERIOL + Surprisal',    tag: 'both' },
+  { fn: methodPhonetic,      id: '06', name: 'Phonetic Skeleton',     tag: 'info' },
+  { fn: methodMorphological, id: '07', name: 'Morphological Root',    tag: 'cog'  },
+];
+
+function pillHTML(tag) {
+  if (!tag) return '';
+  const map = {
+    info: ['pill-info', 'information theory'],
+    cog:  ['pill-cog',  'cognitive science'],
+    both: ['pill-both', 'info + cog science'],
+  };
+  const [cls, label] = map[tag];
+  return `<span class="info-pill ${cls}">${label}</span>`;
+}
+
+function renderCard(method, result, word) {
+  const score = recognizabilityScore(result.code, word);
+  const scoreWidth = Math.max(5, score) + '%';
+
+  const decompHTML = result.decomp.map(({ch, kept, primary}) =>
+    `<span class="letter-chip ${primary ? 'primary' : kept ? 'kept' : 'dropped'}">${ch}</span>`
+  ).join('');
+
+  const clusterNote = '';
+
+  return `
+    <div class="method-card">
+      <div class="card-header">
+        <span class="method-index">${method.id}</span>
+        <div>
+          <div class="method-name">${method.name}</div>
+          <div class="method-basis">${result.basis}</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="output-display">
+          <span class="output-code ${result.code ? '' : 'empty'}">${result.code || '—'}</span>
+        </div>
+        <div class="decomp">${decompHTML}</div>
+        <div class="info-row">${pillHTML(method.tag)}</div>
+        <div class="entropy-bar-wrap">
+          <div class="entropy-label">
+            <span>recognizability estimate</span>
+            <span>${score}%</span>
+          </div>
+          <div class="entropy-bar"><div class="entropy-fill" style="width:${scoreWidth}"></div></div>
+        </div>
+        ${clusterNote}
+        <div class="rule-text">${result.rule}</div>
+      </div>
+    </div>`;
+}
+
+function computeWordStats(word) {
+  const w = word.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  if (!w) return '';
+  const vowelCount = w.split('').filter(isVowel).length;
+  const consCount  = w.length - vowelCount;
+  const totalSurprisal = w.split('').reduce((s, ch) => s + surprisal(ch), 0).toFixed(1);
+  const avgSurprisal   = (totalSurprisal / w.length).toFixed(2);
+  return `
+    <span class="stat">length<span class="stat-val">${w.length}</span></span>
+    <span class="stat">vowels<span class="stat-val">${vowelCount}</span></span>
+    <span class="stat">consonants<span class="stat-val">${consCount}</span></span>
+    <span class="stat">total surprisal<span class="stat-val">${totalSurprisal} bits</span></span>
+    <span class="stat">avg/letter<span class="stat-val">${avgSurprisal} bits</span></span>
+  `;
+}
+
+function update(word) {
+  const grid  = document.getElementById('resultsGrid');
+  const stats = document.getElementById('wordStats');
+  const w = word.trim();
+
+  if (!w || w.replace(/[^a-zA-Z]/g, '').length === 0) {
+    grid.innerHTML = '<div class="empty-state">→ enter a word above to run all methods</div>';
+    stats.innerHTML = '';
+    return;
+  }
+
+  stats.innerHTML = computeWordStats(w);
+
+  const cards = METHODS.map(m => {
+    const result = m.fn(w, targetLen);
+    return renderCard(m, result, w);
+  }).join('');
+
+  // Cluster-X modifier card — single instance, outside the method loop
+  const cx = detectClusters(w);
+  const clusterCard = `
+    <div class="method-card cluster-card">
+      <div class="card-header">
+        <span class="method-index cluster-index">mod</span>
+        <div>
+          <div class="method-name cluster-title">Cluster-X Modifier</div>
+          <div class="method-basis">Orthographic + phonological glyph substitution</div>
+        </div>
+      </div>
+      <div class="card-body">
+        ${cx.hasCluster ? `
+          <div class="cluster-found">
+            ${cx.clusters.map(c => `<span class="cluster-chip">${c}</span>`).join('')}
+          </div>
+          <div class="cluster-body-text">
+            Hard consonant cluster${cx.clusters.length > 1 ? 's' : ''} detected.
+            X encodes /kt/, /kʃ/, /ks/ sequences — a single glyph for a phonological
+            cluster. Orthographic precedent: <em>connexion ↔ connection</em>,
+            <em>reflexion ↔ reflection</em>. Any method above may substitute X
+            for the marked cluster — this is a designer's override, not an
+            automatic rule.
+          </div>
+        ` : `
+          <div class="cluster-none">no substitutable clusters detected</div>
+          <div class="cluster-body-text">
+            No ct, xt, ks, cks, -ction, -xion, qu, or cc+e/i sequences found.
+            X substitution is not applicable for this input.
+          </div>
+        `}
+        <div class="cluster-examples">
+          <span class="cluster-ex-label">try →</span>
+          reduction · traction · extraction · connexion · tracks · success
+        </div>
+      </div>
+    </div>`;
+
+  grid.innerHTML = cards + clusterCard;
+}
+
+const input = document.getElementById('wordInput');
+input.addEventListener('input', e => update(e.target.value));
+input.focus();
+
+// Length toggle buttons
+document.querySelectorAll('.len-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.len-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    targetLen = parseInt(btn.dataset.len);
+    document.getElementById('titleLen').textContent = targetLen;
+    update(input.value);
+  });
+});
+
+// Seed with an example that demonstrates cluster-X
+update('reduction');
+input.value = 'reduction';
+</script>
+</body>
+</html>
