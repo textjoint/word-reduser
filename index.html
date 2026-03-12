@@ -1099,8 +1099,7 @@ function update(word) {
 const input = document.getElementById('wordInput');
 input.addEventListener('input', e => {
   const val = e.target.value.trim();
-  const newPath = val ? '/' + encodeURIComponent(val) : '/';
-  history.replaceState(null, '', newPath);
+  history.replaceState(null, '', val ? '#' + encodeURIComponent(val) : '#');
   update(val);
 });
 input.focus();
@@ -1116,9 +1115,9 @@ document.querySelectorAll('.len-btn').forEach(btn => {
   });
 });
 
-// Read word from URL path on load (e.g. /reduction)
-const pathWord = decodeURIComponent(location.pathname.replace(/^\//, '').trim());
-const seedWord = pathWord || 'reduction';
+// Read word from hash on load (e.g. #reduction)
+const hashWord = decodeURIComponent(location.hash.replace(/^#/, '').trim());
+const seedWord = hashWord || 'reduction';
 update(seedWord);
 input.value = seedWord;
 </script>
