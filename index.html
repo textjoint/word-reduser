@@ -340,11 +340,12 @@
   /* Letter decomposition visual */
   .decomp {
     display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow: hidden;
     margin-bottom: 14px;
     min-height: 28px;
     align-items: center;
+    transform-origin: left center;
   }
 
   .letter-chip {
@@ -963,13 +964,13 @@ function detectClusters(word) {
 let targetLen = 3;
 
 const METHODS = [
-  { fn: methodTruncation,    id: '01', name: 'Pure Truncation',       tag: null  },
-  { fn: methodDisemvowel,    id: '02', name: 'Disemvoweling',         tag: 'info' },
-  { fn: methodShannon,       id: '03', name: 'Shannon Surprisal',     tag: 'info' },
-  { fn: methodHBT,           id: '04', name: 'Head–Body–Tail',        tag: 'cog'  },
-  { fn: methodSERIOL,        id: '05', name: 'SERIOL + Surprisal',    tag: 'both' },
-  { fn: methodPhonetic,      id: '06', name: 'Phonetic Skeleton',     tag: 'info' },
-  { fn: methodMorphological, id: '07', name: 'Morphological Root',    tag: 'cog'  },
+  { fn: methodDisemvowel,    id: '01', name: 'Disemvoweling',         tag: 'info' },
+  { fn: methodShannon,       id: '02', name: 'Shannon Surprisal',     tag: 'info' },
+  { fn: methodHBT,           id: '03', name: 'Head–Body–Tail',        tag: 'cog'  },
+  { fn: methodSERIOL,        id: '04', name: 'SERIOL + Surprisal',    tag: 'both' },
+  { fn: methodPhonetic,      id: '05', name: 'Phonetic Skeleton',     tag: 'info' },
+  { fn: methodMorphological, id: '06', name: 'Morphological Root',    tag: 'cog'  },
+  { fn: methodTruncation,    id: '07', name: 'Pure Truncation',       tag: null   },
 ];
 
 function pillHTML(tag) {
@@ -1037,6 +1038,14 @@ function computeWordStats(word) {
   `;
 }
 
+function scaleDecomps() {
+  document.querySelectorAll('.decomp').forEach(el => {
+    el.style.transform = '';
+    const ratio = el.parentElement.clientWidth / el.scrollWidth;
+    if (ratio < 1) el.style.transform = `scaleX(${ratio})`;
+  });
+}
+
 function update(word) {
   const grid  = document.getElementById('resultsGrid');
   const stats = document.getElementById('wordStats');
@@ -1055,9 +1064,8 @@ function update(word) {
     return renderCard(m, result, w);
   }).join('');
 
-  // Cluster-X modifier card — single instance, outside the method loop
   const cx = detectClusters(w);
-  const clusterCard = `
+  const clusterCard = cx.hasCluster ? `
     <div class="method-card cluster-card">
       <div class="card-header">
         <span class="method-index cluster-index">mod</span>
@@ -1067,39 +1075,32 @@ function update(word) {
         </div>
       </div>
       <div class="card-body">
-        ${cx.hasCluster ? `
-          <div class="cluster-found">
-            ${cx.clusters.map(c => `<span class="cluster-chip">${c}</span>`).join('')}
-          </div>
-          <div class="cluster-body-text">
-            Hard consonant cluster${cx.clusters.length > 1 ? 's' : ''} detected.
-            X encodes /kt/, /kʃ/, /ks/ sequences — a single glyph for a phonological
-            cluster. Orthographic precedent: <em>connexion ↔ connection</em>,
-            <em>reflexion ↔ reflection</em>. Any method above may substitute X
-            for the marked cluster — this is a designer's override, not an
-            automatic rule.
-          </div>
-        ` : `
-          <div class="cluster-none">no substitutable clusters detected</div>
-          <div class="cluster-body-text">
-            No ct, xt, ks, cks, -ction, -xion, qu, or cc+e/i sequences found.
-            X substitution is not applicable for this input.
-          </div>
-        `}
+        <div class="cluster-found">
+          ${cx.clusters.map(c => `<span class="cluster-chip">${c}</span>`).join('')}
+        </div>
+        <div class="cluster-body-text">
+          Hard consonant cluster${cx.clusters.length > 1 ? 's' : ''} detected.
+          X encodes /kt/, /kʃ/, /ks/ sequences — a single glyph for a phonological
+          cluster. Orthographic precedent: <em>connexion ↔ connection</em>,
+          <em>reflexion ↔ reflection</em>. Any method above may substitute X
+          for the marked cluster — this is a designer's override, not an
+          automatic rule.
+        </div>
         <div class="cluster-examples">
           <span class="cluster-ex-label">try →</span>
           reduction · traction · extraction · connexion · tracks · success
         </div>
       </div>
-    </div>`;
+    </div>` : '';
 
   grid.innerHTML = cards + clusterCard;
+  scaleDecomps();
 }
 
 const input = document.getElementById('wordInput');
 input.addEventListener('input', e => {
   const val = e.target.value.trim();
-  history.replaceState(null, '', val ? '#' + encodeURIComponent(val) : '#');
+  try { history.replaceState(null, '', val ? '#' + encodeURIComponent(val) : '#'); } catch(_) {}
   update(val);
 });
 input.focus();
